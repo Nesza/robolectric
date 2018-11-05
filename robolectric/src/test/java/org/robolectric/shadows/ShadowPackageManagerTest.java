@@ -701,7 +701,7 @@ public class ShadowPackageManagerTest {
     Intent i = new Intent(Intent.ACTION_APP_ERROR, null);
     i.addCategory(Intent.CATEGORY_APP_BROWSER);
 
-    List<ResolveInfo> activities = packageManager.queryIntentActivitiesAsUser(i, 0, -1);
+    List<ResolveInfo> activities = packageManager.queryIntentActivitiesAsUser(i, 0, 0);
     assertThat(activities).isEmpty();
   }
 
@@ -716,7 +716,7 @@ public class ShadowPackageManagerTest {
 
     shadowPackageManager.addResolveInfoForIntent(i, info);
 
-    List<ResolveInfo> activities = packageManager.queryIntentActivitiesAsUser(i, 0, -1);
+    List<ResolveInfo> activities = packageManager.queryIntentActivitiesAsUser(i, 0, 0);
     assertThat(activities).isNotNull();
     assertThat(activities).hasSize(2);
     assertThat(activities.get(0).nonLocalizedLabel.toString()).isEqualTo(TEST_PACKAGE_LABEL);
@@ -815,6 +815,29 @@ public class ShadowPackageManagerTest {
   public void queryIntentActivities_DisabledComponentExplicitIntent() throws Exception {
     Intent i = new Intent();
     i.setClassName(
+        ApplicationProvider.getApplicationContext(), "org.robolectric.shadows.DisabledActivity");
+
+    List<ResolveInfo> resolveInfos = packageManager.queryIntentActivities(i, 0);
+    assertThat(resolveInfos).isEmpty();
+  }
+
+  @Test
+  public void queryIntentActivities_MatchDisabledComponents() throws Exception {
+    Intent i = new Intent();
+    i.setClassName(
+        ApplicationProvider.getApplicationContext(), "org.robolectric.shadows.DisabledActivity");
+
+    List<ResolveInfo> resolveInfos =
+        packageManager.queryIntentActivities(i, PackageManager.MATCH_DISABLED_COMPONENTS);
+    assertThat(resolveInfos).isNotNull();
+    assertThat(resolveInfos).hasSize(1);
+    assertThat(resolveInfos.get(0).activityInfo.enabled).isFalse();
+  }
+
+  @Test
+  public void queryIntentActivities_DisabledComponentViaPmExplicitIntent() throws Exception {
+    Intent i = new Intent();
+    i.setClassName(
         ApplicationProvider.getApplicationContext(), "org.robolectric.shadows.TestActivity");
 
     ComponentName componentToDisable =
@@ -830,7 +853,27 @@ public class ShadowPackageManagerTest {
   }
 
   @Test
-  public void queryIntentActivities_DisabledComponentImplicitIntent() throws Exception {
+  public void queryIntentActivities_DisabledComponentEnabledViaPmExplicitIntent() throws Exception {
+    Intent i = new Intent();
+    i.setClassName(
+        ApplicationProvider.getApplicationContext(), "org.robolectric.shadows.DisabledActivity");
+
+    ComponentName componentToDisable =
+        new ComponentName(
+            ApplicationProvider.getApplicationContext(),
+            "org.robolectric.shadows.DisabledActivity");
+    packageManager.setComponentEnabledSetting(
+        componentToDisable,
+        PackageManager.COMPONENT_ENABLED_STATE_ENABLED,
+        PackageManager.DONT_KILL_APP);
+
+    List<ResolveInfo> resolveInfos = packageManager.queryIntentActivities(i, 0);
+    assertThat(resolveInfos).hasSize(1);
+    assertThat(resolveInfos.get(0).activityInfo.enabled).isFalse();
+  }
+
+  @Test
+  public void queryIntentActivities_DisabledComponentViaPmImplicitIntent() throws Exception {
     Uri uri = Uri.parse("content://testhost1.com:1/testPath/test.jpeg");
     Intent i = new Intent(Intent.ACTION_VIEW);
     i.addCategory(Intent.CATEGORY_DEFAULT);
@@ -849,7 +892,7 @@ public class ShadowPackageManagerTest {
   }
 
   @Test
-  public void queryIntentActivities_MatchDisabledComponents() throws Exception {
+  public void queryIntentActivities_MatchDisabledViaPmComponents() throws Exception {
     Uri uri = Uri.parse("content://testhost1.com:1/testPath/test.jpeg");
     Intent i = new Intent(Intent.ACTION_VIEW);
     i.addCategory(Intent.CATEGORY_DEFAULT);
@@ -867,6 +910,7 @@ public class ShadowPackageManagerTest {
         packageManager.queryIntentActivities(i, PackageManager.MATCH_DISABLED_COMPONENTS);
     assertThat(resolveInfos).isNotNull();
     assertThat(resolveInfos).hasSize(1);
+    assertThat(resolveInfos.get(0).activityInfo.enabled).isTrue();
   }
 
   @Test
@@ -1172,20 +1216,13 @@ public class ShadowPackageManagerTest {
   public void queryIntentContentProviders_MatchDisabledComponents() throws Exception {
     Intent i = new Intent(DocumentsContract.PROVIDER_INTERFACE);
 
-    ComponentName componentToDisable =
-        new ComponentName(
-            "org.robolectric.shadows.TestPackageName", "org.robolectric.shadows.TestProvider");
-    packageManager.setComponentEnabledSetting(
-        componentToDisable,
-        PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
-        PackageManager.DONT_KILL_APP);
-
     ResolveInfo resolveInfo = new ResolveInfo();
     resolveInfo.providerInfo = new ProviderInfo();
     resolveInfo.providerInfo.applicationInfo = new ApplicationInfo();
     resolveInfo.providerInfo.applicationInfo.packageName =
         "org.robolectric.shadows.TestPackageName";
     resolveInfo.providerInfo.name = "org.robolectric.shadows.TestProvider";
+    resolveInfo.providerInfo.enabled = false;
 
     shadowPackageManager.addResolveInfoForIntent(i, resolveInfo);
 
@@ -1207,15 +1244,8 @@ public class ShadowPackageManagerTest {
 
     Intent i = new Intent(DocumentsContract.PROVIDER_INTERFACE);
     i.setClassName(
-        ApplicationProvider.getApplicationContext(), "org.robolectric.shadows.TestActivity");
-
-    ResolveInfo resolveInfo = new ResolveInfo();
-    resolveInfo.providerInfo = new ProviderInfo();
-    resolveInfo.providerInfo.applicationInfo = new ApplicationInfo();
-    resolveInfo.providerInfo.applicationInfo.packageName = packageName;
-    resolveInfo.providerInfo.name = "org.robolectric.shadows.TestProvider";
-
-    shadowPackageManager.addResolveInfoForIntent(i, resolveInfo);
+        ApplicationProvider.getApplicationContext(),
+        "org.robolectric.shadows.testing.TestContentProvider1");
 
     List<ResolveInfo> resolveInfos = packageManager.queryIntentContentProviders(i, 0);
     assertThat(resolveInfos).isEmpty();
@@ -1225,7 +1255,7 @@ public class ShadowPackageManagerTest {
     assertThat(resolveInfos).hasSize(1);
     assertThat(resolveInfos.get(0).providerInfo.applicationInfo.packageName).isEqualTo(packageName);
     assertThat(resolveInfos.get(0).providerInfo.name)
-        .isEqualTo("org.robolectric.shadows.TestProvider");
+        .isEqualTo("org.robolectric.shadows.testing.TestContentProvider1");
   }
 
   @Test
@@ -1708,20 +1738,6 @@ public class ShadowPackageManagerTest {
         "org.robolectric", PackageManager.COMPONENT_ENABLED_STATE_DISABLED, 0);
 
     assertThat(packageManager.getApplicationEnabledSetting("org.robolectric"))
-        .isEqualTo(PackageManager.COMPONENT_ENABLED_STATE_DISABLED);
-  }
-
-  @Test
-  public void testSetComponentEnabledSetting() throws Exception {
-    ComponentName componentName =
-        new ComponentName(ApplicationProvider.getApplicationContext(), "com.foo.Service");
-    assertThat(packageManager.getComponentEnabledSetting(componentName))
-        .isEqualTo(PackageManager.COMPONENT_ENABLED_STATE_DEFAULT);
-
-    packageManager.setComponentEnabledSetting(
-        componentName, PackageManager.COMPONENT_ENABLED_STATE_DISABLED, 0);
-
-    assertThat(packageManager.getComponentEnabledSetting(componentName))
         .isEqualTo(PackageManager.COMPONENT_ENABLED_STATE_DISABLED);
   }
 
@@ -2420,12 +2436,17 @@ public class ShadowPackageManagerTest {
   public void setApplicationHiddenSettingAsUser_dontIncludeUninstalled() throws Exception {
     String packageName = ApplicationProvider.getApplicationContext().getPackageName();
 
-    packageManager.setApplicationHiddenSettingAsUser(
-        packageName, /* hidden= */ true, /* user= */ null);
+    boolean success =
+        packageManager.setApplicationHiddenSettingAsUser(
+            packageName, /* hidden= */ true, /* user= */ null);
+
+    assertThat(success).isTrue();
 
     try {
-      packageManager.getPackageInfo(packageName, /* flags= */ 0);
-      fail("PackageManager.NameNotFoundException not thrown");
+      PackageInfo info = packageManager.getPackageInfo(packageName, /* flags= */ 0);
+      fail(
+          "PackageManager.NameNotFoundException not thrown. Returned app with flags: "
+              + info.applicationInfo.flags);
     } catch (NameNotFoundException e) {
       // Expected
     }

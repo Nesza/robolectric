@@ -98,6 +98,7 @@ import org.robolectric.util.ReflectionHelpers;
 @SuppressWarnings("NewApi")
 @Implements(PackageManager.class)
 public class ShadowPackageManager {
+  static final String TAG = "PackageManager";
 
   static Map<String, Boolean> permissionRationaleMap = new HashMap<>();
   static List<FeatureInfo> systemAvailableFeatures = new ArrayList<>();
@@ -131,6 +132,7 @@ public class ShadowPackageManager {
   static Set<String> hiddenPackages = new HashSet<>();
   static Multimap<Integer, String> sequenceNumberChangedPackagesMap = HashMultimap.create();
   static boolean canRequestPackageInstalls = false;
+  static boolean shoudShowActivityChooser = false;
 
   /**
    * Settings for a particular package.
@@ -440,7 +442,7 @@ public class ShadowPackageManager {
   public synchronized void addPackage(PackageInfo packageInfo, PackageStats packageStats) {
     if (packageInfo.applicationInfo != null
         && (packageInfo.applicationInfo.flags & ApplicationInfo.FLAG_INSTALLED) == 0) {
-      Log.w("PackageManager", "Adding not installed package: " + packageInfo.packageName);
+      Log.w(TAG, "Adding not installed package: " + packageInfo.packageName);
     }
     Preconditions.checkArgument(packageInfo.packageName.equals(packageStats.packageName));
 
@@ -984,9 +986,13 @@ public class ShadowPackageManager {
   /** Compares {@link ResolveInfo}, where better is bigger. */
   static class ResolveInfoComparator implements Comparator<ResolveInfo> {
 
-    private final HashSet<ComponentName> preferredComponents;
+    private final Set<ComponentName> preferredComponents;
 
-    public ResolveInfoComparator(HashSet<ComponentName> preferredComponents) {
+    public ResolveInfoComparator() {
+      this.preferredComponents = Collections.emptySet();
+    }
+
+    public ResolveInfoComparator(Set<ComponentName> preferredComponents) {
       this.preferredComponents = preferredComponents;
     }
 
@@ -1115,6 +1121,14 @@ public class ShadowPackageManager {
   public PackageSetting getPackageSetting(String packageName) {
     PackageSetting setting = packageSettings.get(packageName);
     return setting == null ? null : new PackageSetting(setting);
+  }
+
+  /**
+   * Tells if in case of many activities matchin the filter, activity chooser should be resolved
+   * instead of just the first pick.
+   */
+  public void setShoudShowActivityChooser(boolean shoudShowActivityChooser) {
+    this.shoudShowActivityChooser = shoudShowActivityChooser;
   }
 
   @Resetter
