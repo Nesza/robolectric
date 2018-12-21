@@ -30,6 +30,7 @@ public class ShadowBluetoothDevice {
   private boolean createdBond = false;
   private boolean fetchUuidsWithSdpResult = false;
   private int fetchUuidsWithSdpCount = 0;
+  private int type;
 
   /**
    * Implements getService() in the same way the original method does, but ignores any Exceptions
@@ -55,6 +56,16 @@ public class ShadowBluetoothDevice {
   @Implementation
   protected String getName() {
     return name;
+  }
+
+  public void setType(int type) {
+    this.type = type;
+  }
+
+  /* Grabs the type of the shadow bluetooth object. */
+  @Implementation(minSdk = JELLY_BEAN_MR2)
+  protected int getType() {
+    return type;
   }
 
   /** Sets the return value for {@link BluetoothDevice#getUuids}. */
