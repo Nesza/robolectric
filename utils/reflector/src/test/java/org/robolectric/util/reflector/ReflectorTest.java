@@ -17,11 +17,14 @@ public class ReflectorTest {
 
   private SomeClass someClass;
   private _SomeClass_ reflector;
+  private _SomeClass_ staticReflector;
 
   @Before
   public void setUp() throws Exception {
     someClass = new SomeClass("c");
     reflector = reflector(_SomeClass_.class, someClass);
+
+    staticReflector = reflector(_SomeClass_.class, null);
   }
 
   @Test
@@ -47,6 +50,13 @@ public class ReflectorTest {
   }
 
   @Test
+  public void reflector_shouldCallStaticMethod() throws Exception {
+    assertThat(reflector.someStaticMethod("a", "b")).isEqualTo("a-b (someStaticMethod)");
+
+    assertThat(staticReflector.someStaticMethod("a", "b")).isEqualTo("a-b (someStaticMethod)");
+  }
+
+  @Test
   public void reflector_fieldAccessors() throws Exception {
     assertThat(reflector.getC()).isEqualTo("c");
 
@@ -60,6 +70,14 @@ public class ReflectorTest {
 
     reflector.setD(1234);
     assertThat(reflector.getD()).isEqualTo(1234);
+  }
+
+  @Test
+  public void reflector_staticFieldAccessors() throws Exception {
+    assertThat(reflector.getEStatic()).isEqualTo(null);
+
+    reflector.setEStatic("eee!");
+    assertThat(reflector.getEStatic()).isEqualTo("eee!");
   }
 
   @Ignore
@@ -102,9 +120,30 @@ public class ReflectorTest {
 
   //////////////////////
 
-  /** Accessor interface for {@link SomeClass}'s private methods. */
+  /** Accessor interface for {@link SomeClass}'s internals. */
   @ForType(SomeClass.class)
   interface _SomeClass_ {
+
+    @Static
+    String someStaticMethod(String a, String b);
+
+    @Static @Accessor("eStatic")
+    void setEStatic(String value);
+
+    @Static @Accessor("eStatic")
+    String getEStatic();
+
+    @Accessor("c")
+    void setC(String value);
+
+    @Accessor("c")
+    String getC();
+
+    @Accessor("mD")
+    void setD(int value);
+
+    @Accessor("mD")
+    int getD();
 
     String someMethod(String a, String b);
 
@@ -122,22 +161,12 @@ public class ReflectorTest {
     }
 
     long returnLong();
-
-    @Accessor("c")
-    void setC(String value);
-
-    @Accessor("c")
-    String getC();
-
-    @Accessor("mD")
-    void setD(int value);
-
-    @Accessor("mD")
-    int getD();
   }
 
+  @SuppressWarnings("unused")
   static class SomeClass {
 
+    private static String eStatic;
     private String c;
     private int mD;
 
@@ -145,17 +174,18 @@ public class ReflectorTest {
       this.c = c;
     }
 
-    @SuppressWarnings("unused")
+    private static String someStaticMethod(String a, String b) {
+      return a + "-" + b + " (someStaticMethod)";
+    }
+
     private String someMethod(String a, String b) {
       return a + "-" + b + "-" + c + " (someMethod)";
     }
 
-    @SuppressWarnings("unused")
     private String anotherMethod(String a, String b) {
       return a + "-" + b + "-" + c + " (anotherMethod)";
     }
 
-    @SuppressWarnings("unused")
     private long returnLong() {
       return 1234L;
     }
